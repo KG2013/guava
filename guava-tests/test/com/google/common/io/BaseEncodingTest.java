@@ -14,6 +14,7 @@
 
 package com.google.common.io;
 
+import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.io.BaseEncoding.base32;
 import static com.google.common.io.BaseEncoding.base32Hex;
@@ -27,17 +28,14 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.BaseEncoding.DecodingException;
-
-import junit.framework.TestCase;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
-
-import javax.annotation.Nullable;
+import junit.framework.TestCase;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Tests for {@code BaseEncoding}.
@@ -46,12 +44,6 @@ import javax.annotation.Nullable;
  */
 @GwtCompatible(emulated = true)
 public class BaseEncodingTest extends TestCase {
-  public static void assertEquals(byte[] expected, byte[] actual) {
-    assertEquals(expected.length, actual.length);
-    for (int i = 0; i < expected.length; i++) {
-      assertEquals(expected[i], actual[i]);
-    }
-  }
 
   public void testSeparatorsExplicitly() {
     testEncodes(base64().withSeparator("\n", 3), "foobar", "Zm9\nvYm\nFy");
@@ -61,22 +53,25 @@ public class BaseEncodingTest extends TestCase {
 
   public void testSeparatorSameAsPadChar() {
     try {
-      BaseEncoding unused = base64().withSeparator("=", 3);
+      base64().withSeparator("=", 3);
       fail("Expected IllegalArgumentException");
-    } catch (IllegalArgumentException expected) {}
+    } catch (IllegalArgumentException expected) {
+    }
 
     try {
-      BaseEncoding unused = base64().withPadChar('#').withSeparator("!#!", 3);
+      base64().withPadChar('#').withSeparator("!#!", 3);
       fail("Expected IllegalArgumentException");
-    } catch (IllegalArgumentException expected) {}
+    } catch (IllegalArgumentException expected) {
+    }
   }
 
   public void testAtMostOneSeparator() {
     BaseEncoding separated = base64().withSeparator("\n", 3);
     try {
-      BaseEncoding unused = separated.withSeparator("$", 4);
+      separated.withSeparator("$", 4);
       fail("Expected UnsupportedOperationException");
-    } catch (UnsupportedOperationException expected) {}
+    } catch (UnsupportedOperationException expected) {
+    }
   }
 
   public void testBase64() {
@@ -90,7 +85,7 @@ public class BaseEncodingTest extends TestCase {
     testEncodingWithSeparators(base64(), "foobar", "Zm9vYmFy");
   }
 
-  @GwtIncompatible("Reader/Writer")
+  @GwtIncompatible // Reader/Writer
   public void testBase64Streaming() throws IOException {
     // The following test vectors are specified in RFC 4648 itself
     testStreamingEncodingWithSeparators(base64(), "", "");
@@ -126,7 +121,7 @@ public class BaseEncodingTest extends TestCase {
 
   public void testBase64CannotUpperCase() {
     try {
-      BaseEncoding unused = base64().upperCase();
+      base64().upperCase();
       fail();
     } catch (IllegalStateException expected) {
       // success
@@ -135,7 +130,7 @@ public class BaseEncodingTest extends TestCase {
 
   public void testBase64CannotLowerCase() {
     try {
-      BaseEncoding unused = base64().lowerCase();
+      base64().lowerCase();
       fail();
     } catch (IllegalStateException expected) {
       // success
@@ -153,7 +148,7 @@ public class BaseEncodingTest extends TestCase {
     testEncodingWithSeparators(enc, "foobar", "Zm9vYmFy");
   }
 
-  @GwtIncompatible("Reader/Writer")
+  @GwtIncompatible // Reader/Writer
   public void testBase64StreamingAlternatePadding() throws IOException {
     BaseEncoding enc = base64().withPadChar('~');
     testStreamingEncodingWithSeparators(enc, "", "");
@@ -176,7 +171,7 @@ public class BaseEncodingTest extends TestCase {
     testEncodingWithSeparators(enc, "foobar", "Zm9vYmFy");
   }
 
-  @GwtIncompatible("Reader/Writer")
+  @GwtIncompatible // Reader/Writer
   public void testBase64StreamingOmitPadding() throws IOException {
     BaseEncoding enc = base64().omitPadding();
     testStreamingEncodingWithSeparators(enc, "", "");
@@ -207,7 +202,7 @@ public class BaseEncodingTest extends TestCase {
     testEncodingWithCasing(base32(), "foobar", "MZXW6YTBOI======");
   }
 
-  @GwtIncompatible("Reader/Writer")
+  @GwtIncompatible // Reader/Writer
   public void testBase32Streaming() throws IOException {
     // The following test vectors are specified in RFC 4648 itself
     testStreamingEncodingWithCasing(base32(), "", "");
@@ -278,7 +273,7 @@ public class BaseEncodingTest extends TestCase {
     testEncodingWithCasing(base32Hex(), "foobar", "CPNMUOJ1E8======");
   }
 
-  @GwtIncompatible("Reader/Writer")
+  @GwtIncompatible // Reader/Writer
   public void testBase32HexStreaming() throws IOException {
     // The following test vectors are specified in RFC 4648 itself
     testStreamingEncodingWithCasing(base32Hex(), "", "");
@@ -362,7 +357,9 @@ public class BaseEncodingTest extends TestCase {
     // test separators work
     for (int sepLength = 3; sepLength <= 5; sepLength++) {
       for (String separator : ImmutableList.of(",", "\n", ";;", "")) {
-        testEncoding(encoding.withSeparator(separator, sepLength), decoded,
+        testEncoding(
+            encoding.withSeparator(separator, sepLength),
+            decoded,
             Joiner.on(separator).join(Splitter.fixedLength(sepLength).split(encoded)));
       }
     }
@@ -374,17 +371,17 @@ public class BaseEncodingTest extends TestCase {
   }
 
   private static void testEncodes(BaseEncoding encoding, String decoded, String encoded) {
-    assertEquals(encoded, encoding.encode(getBytes(decoded)));
+    assertThat(encoding.encode(decoded.getBytes(UTF_8))).isEqualTo(encoded);
   }
 
   private static void testEncodesWithOffset(
       BaseEncoding encoding, String decoded, int offset, int len, String encoded) {
-    assertEquals(encoded, encoding.encode(getBytes(decoded), offset, len));
+    assertThat(encoding.encode(decoded.getBytes(UTF_8), offset, len)).isEqualTo(encoded);
   }
 
   private static void testDecodes(BaseEncoding encoding, String encoded, String decoded) {
     assertTrue(encoding.canDecode(encoded));
-    assertEquals(getBytes(decoded), encoding.decode(encoded));
+    assertThat(encoding.decode(encoded)).isEqualTo(decoded.getBytes(UTF_8));
   }
 
   private static void assertFailsToDecode(BaseEncoding encoding, String cannotDecode) {
@@ -393,26 +390,78 @@ public class BaseEncodingTest extends TestCase {
 
   private static void assertFailsToDecode(
       BaseEncoding encoding, String cannotDecode, @Nullable String expectedMessage) {
-    assertFalse(encoding.canDecode(cannotDecode));
-    try {
-      byte[] unused = encoding.decode(cannotDecode);
-      fail("Expected IllegalArgumentException");
-    } catch (IllegalArgumentException expected) {
-      if (expectedMessage != null) {
-        assertThat(expected.getCause()).hasMessage(expectedMessage);
-      }
-    }
-    try {
-      byte[] unused = encoding.decodeChecked(cannotDecode);
-      fail("Expected DecodingException");
-    } catch (DecodingException expected) {
-      if (expectedMessage != null) {
-        assertThat(expected).hasMessage(expectedMessage);
-      }
+    // We use this somewhat weird pattern with an enum for each assertion we want to make as a way
+    // of dealing with the fact that one of the assertions is @GwtIncompatible but we don't want to
+    // have to have duplicate @GwtIncompatible test methods just to make that assertion.
+    for (AssertFailsToDecodeStrategy strategy : AssertFailsToDecodeStrategy.values()) {
+      strategy.assertFailsToDecode(encoding, cannotDecode, expectedMessage);
     }
   }
 
-  @GwtIncompatible("Reader/Writer")
+  enum AssertFailsToDecodeStrategy {
+    @GwtIncompatible // decodingStream(Reader)
+    DECODING_STREAM {
+      @Override
+      void assertFailsToDecode(
+          BaseEncoding encoding, String cannotDecode, @Nullable String expectedMessage) {
+        // Regression test for case where DecodingException was swallowed by default implementation
+        // of
+        // InputStream.read(byte[], int, int)
+        // See https://github.com/google/guava/issues/3542
+        Reader reader = new StringReader(cannotDecode);
+        InputStream decodingStream = encoding.decodingStream(reader);
+        try {
+          ByteStreams.exhaust(decodingStream);
+          fail("Expected DecodingException");
+        } catch (DecodingException expected) {
+          // Don't assert on the expectedMessage; the messages for exceptions thrown from the
+          // decoding stream may differ from the messages for the decode methods.
+        } catch (IOException e) {
+          fail("Expected DecodingException but got: " + e);
+        }
+      }
+    },
+    CAN_DECODE {
+      @Override
+      void assertFailsToDecode(
+          BaseEncoding encoding, String cannotDecode, @Nullable String expectedMessage) {
+        assertFalse(encoding.canDecode(cannotDecode));
+      }
+    },
+    DECODE {
+      @Override
+      void assertFailsToDecode(
+          BaseEncoding encoding, String cannotDecode, @Nullable String expectedMessage) {
+        try {
+          encoding.decode(cannotDecode);
+          fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException expected) {
+          if (expectedMessage != null) {
+            assertThat(expected).hasCauseThat().hasMessageThat().isEqualTo(expectedMessage);
+          }
+        }
+      }
+    },
+    DECODE_CHECKED {
+      @Override
+      void assertFailsToDecode(
+          BaseEncoding encoding, String cannotDecode, @Nullable String expectedMessage) {
+        try {
+          encoding.decodeChecked(cannotDecode);
+          fail("Expected DecodingException");
+        } catch (DecodingException expected) {
+          if (expectedMessage != null) {
+            assertThat(expected).hasMessageThat().isEqualTo(expectedMessage);
+          }
+        }
+      }
+    };
+
+    abstract void assertFailsToDecode(
+        BaseEncoding encoding, String cannotDecode, @Nullable String expectedMessage);
+  }
+
+  @GwtIncompatible // Reader/Writer
   private static void testStreamingEncodingWithCasing(
       BaseEncoding encoding, String decoded, String encoded) throws IOException {
     testStreamingEncodingWithSeparators(encoding, decoded, encoded);
@@ -420,7 +469,7 @@ public class BaseEncodingTest extends TestCase {
     testStreamingEncodingWithSeparators(encoding.lowerCase(), decoded, Ascii.toLowerCase(encoded));
   }
 
-  @GwtIncompatible("Reader/Writer")
+  @GwtIncompatible // Reader/Writer
   private static void testStreamingEncodingWithSeparators(
       BaseEncoding encoding, String decoded, String encoded) throws IOException {
     testStreamingEncoding(encoding, decoded, encoded);
@@ -428,57 +477,51 @@ public class BaseEncodingTest extends TestCase {
     // test separators work
     for (int sepLength = 3; sepLength <= 5; sepLength++) {
       for (String separator : ImmutableList.of(",", "\n", ";;", "")) {
-        testStreamingEncoding(encoding.withSeparator(separator, sepLength), decoded,
+        testStreamingEncoding(
+            encoding.withSeparator(separator, sepLength),
+            decoded,
             Joiner.on(separator).join(Splitter.fixedLength(sepLength).split(encoded)));
       }
     }
   }
 
-  @GwtIncompatible("Reader/Writer")
+  @GwtIncompatible // Reader/Writer
   private static void testStreamingEncoding(BaseEncoding encoding, String decoded, String encoded)
       throws IOException {
     testStreamingEncodes(encoding, decoded, encoded);
     testStreamingDecodes(encoding, encoded, decoded);
   }
 
-  @GwtIncompatible("Writer")
+  @GwtIncompatible // Writer
   private static void testStreamingEncodes(BaseEncoding encoding, String decoded, String encoded)
       throws IOException {
     StringWriter writer = new StringWriter();
     OutputStream encodingStream = encoding.encodingStream(writer);
-    encodingStream.write(getBytes(decoded));
+    encodingStream.write(decoded.getBytes(UTF_8));
     encodingStream.close();
-    assertEquals(encoded, writer.toString());
+    assertThat(writer.toString()).isEqualTo(encoded);
   }
 
-  @GwtIncompatible("Reader")
+  @GwtIncompatible // Reader
   private static void testStreamingDecodes(BaseEncoding encoding, String encoded, String decoded)
       throws IOException {
-    byte[] bytes = getBytes(decoded);
+    byte[] bytes = decoded.getBytes(UTF_8);
     InputStream decodingStream = encoding.decodingStream(new StringReader(encoded));
     for (int i = 0; i < bytes.length; i++) {
-      assertEquals(bytes[i] & 0xFF, decodingStream.read());
+      assertThat(decodingStream.read()).isEqualTo(bytes[i] & 0xFF);
     }
-    assertEquals(-1, decodingStream.read());
+    assertThat(decodingStream.read()).isEqualTo(-1);
     decodingStream.close();
   }
 
-  private static byte[] getBytes(String decoded) {
-    try {
-      // GWT does not support String.getBytes(Charset)
-      return decoded.getBytes("UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      throw new AssertionError();
-    }
-  }
-
   public void testToString() {
-    assertEquals("BaseEncoding.base64().withPadChar(=)", BaseEncoding.base64().toString());
-    assertEquals("BaseEncoding.base32Hex().omitPadding()",
-        BaseEncoding.base32Hex().omitPadding().toString());
-    assertEquals("BaseEncoding.base32().lowerCase().withPadChar($)",
-        BaseEncoding.base32().lowerCase().withPadChar('$').toString());
-    assertEquals("BaseEncoding.base16().withSeparator(\"\n\", 10)",
-        BaseEncoding.base16().withSeparator("\n", 10).toString());
+    assertEquals("BaseEncoding.base64().withPadChar('=')", base64().toString());
+    assertEquals("BaseEncoding.base32Hex().omitPadding()", base32Hex().omitPadding().toString());
+    assertEquals(
+        "BaseEncoding.base32().lowerCase().withPadChar('$')",
+        base32().lowerCase().withPadChar('$').toString());
+    assertEquals(
+        "BaseEncoding.base16().withSeparator(\"\n\", 10)",
+        base16().withSeparator("\n", 10).toString());
   }
 }
